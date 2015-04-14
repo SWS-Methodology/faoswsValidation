@@ -1,8 +1,8 @@
 ##' Basic LM Test
 ##' 
-##' This function computes the a linear model for a set of values and returns
+##' This function computes a linear model for a set of values and returns
 ##' either a 0/1 indicating if a value is flagged as "bad" or a score
-##' indicating how far that value is from the group mean.
+##' indicating how far that value is from the expected value at that point.
 ##' 
 ##' @param y A numeric vector containing the data values.
 ##' @param x A numeric vector containing the independent variable.  If
@@ -14,14 +14,18 @@
 ##' value.
 ##' @param robust Logical indicating if a robust estimate of the linear
 ##' regression model should be used.  Defaults to TRUE, and this is
-##' recommended when the data may have outliers.
+##' recommended as the data may have outliers.
+##' @param alphaLevel Specify the p-value at which we conclude that an
+##' observation is an outlier.  The default value will lead to 3 standard
+##' deviations as an outlier.
 ##' 
 ##' @return A vector of the same length as the input y.  See returnType.  In
-##' the case of the binary return value, a TRUE will represent a flagged value,
+##' the case of the binary return value, a 1 will represent a flagged value,
 ##' i.e. a value which is considered bad or a potential outlier.
 ##' 
 
-basicLmTest = function(y, x = 1:length(y), returnType = "flag", robust = TRUE){
+basicLmTest = function(y, x = 1:length(y), returnType = "flag", robust = TRUE,
+                       alphaLevel = 2*pnorm(-3)){
     
     ## Data Quality Checks
     stopifnot(is(y, "numeric"))
@@ -30,6 +34,12 @@ basicLmTest = function(y, x = 1:length(y), returnType = "flag", robust = TRUE){
     stopifnot(returnType %in% c("score", "flag"))
     stopifnot(is(robust, "logical"))
 
+    ## Check if enough data exists, and if not return all NA's.
+    ## For regression, we need more than 3 observations, as estimating the
+    ## intercept, slope, and error requires 3 d.o.f.
+    if(sum(!is.na(y)) <= 3)
+        return(rep(NA_real_, length(y)))
+    
     data = data.frame(x = x, y = y)
     if(robust){
         fit = try(robustbase::lmrob(y ~ x, data = data))
@@ -48,7 +58,7 @@ basicLmTest = function(y, x = 1:length(y), returnType = "flag", robust = TRUE){
     if(returnType == "score")
         return(1-abs(pnorm(score)))
     else
-        return(as.numeric(abs(score) > 3))
+        return(as.numeric(abs(score) > -qnorm(alphaLevel/2)))
 }
 
 # # Test on simple data, verify code agrees with R's default confidence interval.
